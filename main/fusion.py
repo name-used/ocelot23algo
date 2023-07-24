@@ -47,7 +47,7 @@ def correlated(
             (
                 int(x),
                 int(y),
-                int(c),
+                int(c) + 1,
                 float(p),
             )
         )
