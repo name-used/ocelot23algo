@@ -4,7 +4,7 @@ import numpy as np
 from main import detect
 
 
-class Model():
+class Model:
     """
     Parameters
     ----------
