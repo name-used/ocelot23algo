@@ -1,7 +1,7 @@
 from util import gcio
 from util.constants import (
-    GC_CELL_FPATH, 
-    GC_TISSUE_FPATH, 
+    GC_CELL_FPATH,
+    GC_TISSUE_FPATH,
     GC_METADATA_FPATH,
     GC_DETECTION_OUTPUT_PATH
 )
@@ -17,7 +17,7 @@ def process():
 
     # Cell detection writer
     writer = gcio.DetectionWriter(GC_DETECTION_OUTPUT_PATH)
-    
+
     # Loading metadata
     meta_dataset = gcio.read_json(GC_METADATA_FPATH)
 
@@ -29,7 +29,7 @@ def process():
         print(f"Processing sample pair {pair_id}")
         # Cell-tissue patch pair inference
         cell_classification = model(cell_patch, tissue_patch, pair_id)
-        
+
         # Updating predictions
         writer.add_points(cell_classification, pair_id)
 
@@ -39,4 +39,3 @@ def process():
 
 if __name__ == "__main__":
     process()
-

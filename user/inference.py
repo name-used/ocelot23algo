@@ -12,11 +12,12 @@ class Model:
         Dataset metadata in case you wish to compute statistics
 
     """
-    def __init__(self, metadata):
+
+    def __init__(self, metadata, developing=False):
         self.metadata = metadata
+        self.developing = developing
 
     def __call__(self, cell_patch: np.ndarray[np.uint8], tissue_patch: np.ndarray[np.uint8], pair_id: str) -> List[Tuple[int, int, int, float]]:
-
         # 从 metadata 中生成 cell 图在 tissue 图里的偏移量，其它参数都是固定的，不用管
         x = round(self.metadata[pair_id]['patch_x_offset'] * tissue_patch.shape[1])
         y = round(self.metadata[pair_id]['patch_y_offset'] * tissue_patch.shape[0])
@@ -25,6 +26,7 @@ class Model:
             cell=cell_patch,
             tissue=tissue_patch,
             offset=(x, y),
+            cache_code=self.developing and pair_id,
         )
 
     # def __call__(self, cell_patch: np.ndarray[np.uint8], tissue_patch: np.ndarray[np.uint8], pair_id: str) -> List[Tuple[int, int, int, float]]:
