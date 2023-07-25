@@ -5,7 +5,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 ./build.sh
 
 # Maximum is currently 30g, configurable in your algorithm image settings on grand challenge
-MEM_LIMIT="4g"
+MEM_LIMIT="15g"
 
 docker volume create ocelot23algo-output
 
