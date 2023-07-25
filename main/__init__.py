@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 from .merge import Merger
-from .fusion import correlated
+from .fusion_wentai import correlated
 
 
 detector = torch.jit.load('./weights/detector-jit.pth')
@@ -41,38 +41,52 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
         if cache_code and \
-                os.path.exists(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_coarse.weight') and \
-                os.path.exists(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_fine.weight') and \
-                os.path.exists(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_classify.weight'):
-            coarse_heat_map = torch.load(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_coarse.weight')
-            fine_heat_map = torch.load(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_fine.weight')
-            classify_heat_map = torch.load(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_classify.weight')
+                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight') and \
+                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight') and \
+                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight'):
+            coarse_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight')
+            fine_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight')
+            classify_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight')
         else:
             # 遍历截图
+            patches = []
+            grids = []
             for y in range(0, height - kernel + 1, step):
                 for x in range(0, width - kernel + 1, step):
                     # 图像预处理
                     image = cell[y: y + kernel, x: x + kernel, :] / 255
-                    image = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0).permute(0, 3, 1, 2)
-                    # 预测流程
-                    coarse_patch: torch.Tensor
-                    fine_patch: torch.Tensor
-                    classify_patch: torch.Tensor
-                    coarse_patch, fine_patch, classify_patch = detector(image)
-                    # 预测后处理
-                    coarse_patch = coarse_patch.softmax(dim=1)[:, 1:, :, :]
-                    fine_patch = fine_patch.clamp(0, 1)
-                    classify_patch = classify_patch.clamp(0, 1)
-                    # 融合
-                    merger.set(
-                        patches_group=(coarse_patch, fine_patch, classify_patch),
-                        grids=[(x, y)],
-                    )
+                    patches.append(image)
+                    grids.append((x, y))
+            image = torch.tensor(patches, dtype=torch.float32, device=device).permute(0, 3, 1, 2)
+            # 在这里做升降采样
+            image = F.interpolate(image, size=(kernel // 2, kernel // 2), mode='bilinear').contiguous()
+
+            # image = torch.concat(patches, dim=0).contiguous()
+            # 预测流程
+            coarse_patch: torch.Tensor
+            fine_patch: torch.Tensor
+            classify_patch: torch.Tensor
+            coarse_patch, fine_patch, classify_patch = detector(image)
+
+            # 在这里做升降采样
+            coarse_patch = F.interpolate(coarse_patch, size=(kernel, kernel), mode='bilinear').contiguous()
+            fine_patch = F.interpolate(fine_patch, size=(kernel, kernel), mode='bilinear').contiguous()
+            classify_patch = F.interpolate(classify_patch, size=(kernel, kernel), mode='bilinear').contiguous()
+
+            # 预测后处理
+            coarse_patch = coarse_patch.softmax(dim=1)[:, 1:, :, :]
+            fine_patch = fine_patch.clamp(0, 1)
+            classify_patch = classify_patch.clamp(0, 1)
+            # 融合
+            merger.set(
+                patches_group=(coarse_patch, fine_patch, classify_patch),
+                grids=grids,
+            )
             coarse_heat_map, fine_heat_map, classify_heat_map = merger.tail()
             if cache_code:
-                torch.save(coarse_heat_map, rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_coarse.weight')
-                torch.save(fine_heat_map, rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_fine.weight')
-                torch.save(classify_heat_map, rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_classify.weight')
+                torch.save(coarse_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight')
+                torch.save(fine_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight')
+                torch.save(classify_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight')
 
     # 然后执行组织分割任务，生成分割热图
     with torch.no_grad():
@@ -86,27 +100,29 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
                 device=device,
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
-        if cache_code and os.path.exists(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_divide.weight'):
-            divide_heat_map = torch.load(rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_divide.weight')
+        if cache_code and os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight'):
+            divide_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight')
         else:
             # 遍历截图
+            patches = []
+            grids = []
             for y in range(0, height - kernel + 1, step):
                 for x in range(0, width - kernel + 1, step):
                     # 图像预处理
                     image = (tissue[y: y + kernel, x: x + kernel, :] / 255 - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
-                    image = torch.tensor(image, dtype=torch.float32, device=device).unsqueeze(0).permute(0, 3, 1, 2)
-                    # 预测流程
-                    divide_heat_patch: torch.Tensor = divider(image)
-                    # 预测后处理
-                    pass
-                    # 融合
-                    merger.set(
-                        patches_group=(divide_heat_patch,),
-                        grids=[(x, y)]
-                    )
+                    patches.append(image)
+                    grids.append((x, y))
+            image = torch.tensor(patches, dtype=torch.float32, device=device).permute(0, 3, 1, 2).contiguous()
+            # 预测流程
+            divide_heat_patch: torch.Tensor = divider(image)
+            # 融合
+            merger.set(
+                patches_group=(divide_heat_patch,),
+                grids=[(x, y)]
+            )
             divide_heat_map, = merger.tail()
             if cache_code:
-                torch.save(divide_heat_map, rf'D:\jassorRepository\OCELOT_Dataset\jassor\predict\{cache_code}_divide.weight')
+                torch.save(divide_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight')
 
     # 最后乱七八糟的融合方法各种上，并且返回结果
     with torch.no_grad():

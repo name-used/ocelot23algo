@@ -6,7 +6,7 @@ import os
 import numpy as np
 from skimage import feature
 import cv2
-from util.constants import SAMPLE_SHAPE
+from util.constants_test import SAMPLE_SHAPE
 
 import torch
 import torch.nn as nn
