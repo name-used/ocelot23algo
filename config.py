@@ -1,0 +1,5 @@
+output_root = rf'/media/predator/totem/jizheng/ocelot2023/submit_test'
+# target = rf'liner_3_e17_set'
+# target = rf'weighter_set'
+# target = rf'normal'
+target = rf'wentai_point_try'

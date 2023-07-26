@@ -17,29 +17,28 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    根据 detect 设定 class
+    直接根据 divide 设定class
     """
-    thresh = 0.2
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
     # 联合图转换至网络形式
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
-    classify = combo * classify[None, :, :, :]
     # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
-    classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
+    # classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
 
     # 范围截断
     combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0])
 
     # 获得点列
-    points = get_pts_from_hm(combo, thresh)
+    points = get_pts_from_hm(combo, 0.3)
 
     # 获得类型列
-    classes = get_cls_pts_from_hm(points, classify)
+    # classes = get_cls_pts_from_hm(points, classify)
+    classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
 
     # 获得概率列
     possibility = [combo[y, x, 0] for y, x in points]

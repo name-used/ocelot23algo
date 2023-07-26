@@ -17,17 +17,26 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    根据 detect 设定 class
+    将 detect 和 divide 线性分配设定 class
     """
-    thresh = 0.2
+
+    # 点检测的设定阈值
+    thresh = 0.3
+    # detect 结果相关的软阈值
+    limit = 1e-17
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
     # 联合图转换至网络形式
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
+    # w = 2 * c * (1 - c)
+    # p = t * w + c * (1 - w)
+    classify = classify + limit
+    classify = classify / classify.sum(dim=0, keepdim=True)
+    weights = 2 * classify * (1 - classify)
+    classify = divide * weights + classify * (1 - weights)
     classify = combo * classify[None, :, :, :]
-    # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
     classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
