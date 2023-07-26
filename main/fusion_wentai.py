@@ -56,11 +56,11 @@ def heatmap_nms(hm: np.ndarray):
     # a3 = cv2.blur(hm * 255, (7, 7)).astype(np.int32)
     # h = a + a1 + a2 + a3
     # h = (h / 4).astype(np.float32)
-    device = 'cpu'
-    kernel = gaussian_kernel(size=29, steep=4, device=device)    # 初始值 9
+    device = 'cuda:1'
+    kernel = gaussian_kernel(size=17, steep=4, device=device)    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=14, dilation=1, groups=1)
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = h[0, 0, :, :].detach().cpu().numpy()
 
     ht = torch.tensor(h)[None, None, ...]

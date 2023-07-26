@@ -1,7 +1,12 @@
+import io
+import sys
+from threading import Condition
+from time import time
 from typing import List, Tuple
 
 import cv2
 import torch
+import torch.nn.functional as F
 import json
 import segmentation_models_pytorch as smp
 
@@ -9,41 +14,81 @@ from config import output_root
 
 
 def main():
-
-    net = Net(16)
+    net = Net()
     net.to(device)
+    optimizer = torch.optim.Adam(params=net.parameters(), lr=1e-3, eps=1e-17)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 2, 2, 1e-5)
 
-    print(net)
+    # kernel 用来处理 label 的问题
+    kernel = gaussian_kernel(size=16, steep=4, device=device)
+    kernel = kernel - kernel.min()
+    kernel = kernel / kernel.max()
 
-    inputs = torch.zeros(1, 3, 16, 16, dtype=torch.float32, device=device)
+    with Timer() as T:
+        for i in range(40):
+            scheduler.step(i)
+            optimizer.zero_grad()
+            for code in trains:
+                # T.track(f' -> epoch {i}: training {code}')
+                # 预测权重
+                coarse = torch.load(rf'{output_root}/predict/{code}_coarse.weight', map_location=device)
+                fine = torch.load(rf'{output_root}/predict/{code}_fine.weight', map_location=device)
+                classify = torch.load(rf'{output_root}/predict/{code}_classify.weight', map_location=device)
+                divide = torch.load(rf'{output_root}/predict/{code}_divide.weight', map_location=device)
+                # 图片
+                image = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image = torch.tensor(image / 255, dtype=torch.float32, device=device).permute(2, 0, 1)
+                # 细胞检测标签
+                label = torch.zeros_like(classify)
+                with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
+                    for line in f.readlines():
+                        x, y, c = map(int, line.split(','))
+                        label[c - 1, y, x] = 1
+                # 组织为 batches 进行训练
+                images = []
+                coarses = []
+                fines = []
+                classifies = []
+                divides = []
+                gts = []
+                for y in range(0, 1024 - 16 + 1, 16):
+                    for x in range(0, 1024 - 16 + 1, 16):
+                        images.append(image[:, y:y + 16, x:x + 16])
+                        coarses.append(coarse[:, y:y + 16, x:x + 16])
+                        fines.append(fine[:, y:y + 16, x:x + 16])
+                        classifies.append(classify[:, y:y + 16, x:x + 16])
+                        divides.append(divide[:, y:y + 16, x:x + 16])
+                        gts.append(torch.tensor([
+                            # 维度 0 表示点的自信度
+                            (label[:, y:y + 16, x:x + 16].sum(0) * kernel).sum(),
+                            # 维度 1、2 表示点的类型
+                            (label[0, y:y + 16, x:x + 16] * kernel).sum(),
+                            (label[1, y:y + 16, x:x + 16] * kernel).sum(),
+                        ], dtype=torch.float32, device=device))
 
-    outputs = net(inputs, None, None, None, None)
+                images = torch.stack(images).type(torch.float32)
+                coarses = torch.stack(coarses).type(torch.float32)
+                fines = torch.stack(fines).type(torch.float32)
+                classifies = torch.stack(classifies).type(torch.float32)
+                divides = torch.stack(divides).type(torch.float32)
+                gts = torch.stack(gts).type(torch.float32)
 
-    print(inputs.shape, len(outputs), [x.shape for x in outputs])
+                prs = net(images, coarses, fines, classifies, divides)
 
-    return
+                loss = gts * torch.log(prs + 1e-17) + (1 - gts) * torch.log(1 - prs + 1e-17)
+                loss = - loss.sum()
+                loss.backward()
 
-    for code in trains:
-        # 预测权重
-        coarse = torch.load(rf'{output_root}/predict/{code}_coarse.weight')
-        fine = torch.load(rf'{output_root}/predict/{code}_fine.weight')
-        classify = torch.load(rf'{output_root}/predict/{code}_classify.weight')
-        divide = torch.load(rf'{output_root}/predict/{code}_divide.weight')
-        # 图片
-        cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
-        cell = cv2.cvtColor(cell, cv2.COLOR_BGR2RGB)
-        # 细胞检测标签
-        with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
-            labels: List[Tuple[int, int, int]] = []
-            for line in f.readlines():
-                x, y, c = map(int, line.split(','))
-                labels.append((x, y, c))
+                T.track(f' -> epoch {i}: training {code} with loss %.4f and dist %.4f' % (loss, ((prs - gts) * gts).abs().sum() / (gts.sum() + 1e-17)))
+                optimizer.step()
+            torch.save(net, f'./training_weights/epoch-{i}.pth')
 
 
 class Net(torch.nn.Module):
     model_id = 'lasted'
 
-    def __init__(self, out_dim: int):
+    def __init__(self):
         super().__init__()
         self.encoder = smp.encoders.get_encoder(
             name='resnet18',
@@ -53,22 +98,149 @@ class Net(torch.nn.Module):
             output_stride=32,
             random=True,
         )
-        pass
+        # nn.Conv2d(in_ch, out_ch, ker_sz, stride, pad, groups=group, bias=False, dilation=dilation),
+        # nn.BatchNorm2d(out_ch, eps=1e-8, momentum=0.9),
+        self.decoder = torch.nn.Sequential(
+            # 通道卷积
+            torch.nn.Conv2d(
+                in_channels=64 * 6,
+                out_channels=64,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                dilation=1,
+                groups=1,
+                bias=True,
+                padding_mode='zeros',
+                device=None,
+                dtype=None,
+            ),
+            torch.nn.BatchNorm2d(64),
+            # torch.nn.GELU(),
+            # 分层卷积
+            torch.nn.Conv2d(
+                in_channels=64,
+                out_channels=64,
+                kernel_size=9,
+                stride=1,
+                padding=0,
+                dilation=1,
+                groups=64,
+                bias=True,
+                padding_mode='zeros',
+                device=None,
+                dtype=None,
+            ),
+            torch.nn.BatchNorm2d(64),
+            # torch.nn.GELU(),
+            # 通道卷积
+            torch.nn.Conv2d(
+                in_channels=64,
+                out_channels=3,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                dilation=1,
+                groups=1,
+                bias=True,
+                padding_mode='zeros',
+                device=None,
+                dtype=None,
+            ),
+            torch.nn.BatchNorm2d(3),
+            # 分类卷积
+            torch.nn.Conv2d(
+                in_channels=3,
+                out_channels=3,
+                kernel_size=8,
+                stride=1,
+                padding=0,
+                dilation=1,
+                groups=3,
+                bias=True,
+                padding_mode='zeros',
+                device=None,
+                dtype=None,
+            ),
+            # torch.nn.BatchNorm2d(3),
+            # torch.nn.Softmax(),
+            torch.nn.Sigmoid(),
+        )
         # self.encoder = smp.encoders.vgg.VGGEncoder(out_channels=16, batch_norm=True)
 
     def forward(
             self,
-            image: torch.Tensor,        # (b, 3, 1024, 1024)
-            coarse: torch.Tensor,       # (b, 1, 1024, 1024)
-            fine: torch.Tensor,         # (b, 1, 1024, 1024)
-            classify: torch.Tensor,     # (b, 2, 1024, 1024)
-            divide: torch.Tensor,       # (b, 2, 1024, 1024)
+            image: torch.Tensor,  # (b, 3, 1024, 1024)
+            coarse: torch.Tensor,  # (b, 1, 1024, 1024)
+            fine: torch.Tensor,  # (b, 1, 1024, 1024)
+            classify: torch.Tensor,  # (b, 2, 1024, 1024)
+            divide: torch.Tensor,  # (b, 2, 1024, 1024)
     ):
+        # 首先用 encoder 对 image 进行编码 # channel == 64
         _, character_8, character_4 = self.encoder(image)
-        return self.encoder(image)
+        # 插值叉上来
+        character_8 = F.interpolate(character_8, size=(16, 16), mode='bilinear')
+        character_4 = F.interpolate(character_4, size=(16, 16), mode='bilinear')
+        # 然后扩大输入的权重
+        coarse = coarse.repeat(1, 64, 1, 1)
+        fine = fine.repeat(1, 64, 1, 1)
+        classify = classify.repeat(1, 32, 1, 1)
+        divide = divide.repeat(1, 32, 1, 1)
+
+        # 特征粘结
+        inputs = torch.concat([
+            character_8, character_4, coarse, fine, classify, divide
+        ], dim=1)
+        # 特征运算
+        return self.decoder(inputs)[:, :, 0, 0]
 
 
-device = 'cuda:0'
+def gaussian_kernel(size: int = 3, steep: float = 2, device: str = 'cpu') -> torch.Tensor:
+    """
+    provide an square matrix that matches the gaussian function
+    this may used like an kernel of weight
+    :param size:    就是高斯核的尺寸
+    :param steep:   描述高斯核的陡峭程度，由于 sigma 必须结合 size 才有意义，因此剥离出 steep 来描述它
+    :param device:
+    """
+    sigma = size / steep
+    kernel_seed = torch.tensor([[
+        -(x - size // 2) ** 2 / float(2 * sigma ** 2)
+        for x in range(size)
+    ]], dtype=torch.float64, device=device)
+    kernel_1d = torch.exp(kernel_seed)
+    # the numbers are too small ~ and there is no influence on multiple
+    kernel = torch.matmul(kernel_1d.T, kernel_1d)
+    return kernel
+
+
+class Timer(object):
+    def __init__(self, start: int = 0, indentation: int = 0, output: io.TextIOWrapper = sys.stdout):
+        self.con = Condition()
+        self.start = start or time()
+        self.indentation = indentation
+        self.output = output
+
+    def __enter__(self):
+        with self.con:
+            self.output.writelines('#%s enter at %.2f seconds\n' % ('\t' * self.indentation, time() - self.start))
+        return self.tab()
+
+    def track(self, message: str):
+        with self.con:
+            self.output.writelines('#%s %s -> at time %.2f\n' % ('\t' * self.indentation, message, time() - self.start))
+
+    def tab(self):
+        with self.con:
+            return Timer(start=self.start, indentation=self.indentation + 1, output=self.output)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        with self.con:
+            self.output.writelines('#%s exit at %.2f seconds\n' % ('\t' * self.indentation, time() - self.start))
+            return False
+
+
+device = 'cuda:1'
 
 with open(r'/media/predator/totem/jizheng/ocelot2023/metadata.json', 'r+') as f:
     metadata = json.load(f)
@@ -108,4 +280,33 @@ cls_color = {
     2: (255, 0, 0),
 }
 
+
+def demo():
+    net = Net()
+    net.to(device)
+
+    optimizer = torch.optim.Adam(params=net.parameters(), lr=1e-2, eps=1e-17)
+
+    inputs = torch.zeros(1, 3, 16, 16, dtype=torch.float32, device=device)
+    coarse = torch.zeros(1, 1, 16, 16, dtype=torch.float32, device=device)
+    fine = torch.zeros(1, 1, 16, 16, dtype=torch.float32, device=device)
+    classify = torch.zeros(1, 2, 16, 16, dtype=torch.float32, device=device)
+    divide = torch.zeros(1, 2, 16, 16, dtype=torch.float32, device=device)
+    label = torch.zeros(1, 3, dtype=torch.float32, device=device)
+
+    inputs[0, :, 5, 5] = coarse[0, :, 5, 5] = fine[0, :, 5, 5] = classify[0, :, 5, 5] = divide[0, :, 5, 5] = label[0, 1] = label[0, 0] = 1
+
+    for i in range(1000):
+        optimizer.zero_grad()
+        outputs = net(inputs, coarse, fine, classify, divide)
+        loss = label * torch.log(outputs + 1e-17) + (1 - label) * torch.log(1 - outputs + 1e-17)
+        loss = - loss.sum()
+        loss.backward()
+        optimizer.step()
+
+        print(i, loss, outputs.mean(), outputs.max(), outputs.min())
+        print(i, loss, (outputs - label).abs().mean())
+
+
+# demo()
 main()
