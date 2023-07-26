@@ -19,8 +19,8 @@ class Model:
 
     def __call__(self, cell_patch: np.ndarray[np.uint8], tissue_patch: np.ndarray[np.uint8], pair_id: str) -> List[Tuple[int, int, int, float]]:
         # 从 metadata 中生成 cell 图在 tissue 图里的偏移量，其它参数都是固定的，不用管
-        x = round(self.metadata[pair_id]['patch_x_offset'] * tissue_patch.shape[1])
-        y = round(self.metadata[pair_id]['patch_y_offset'] * tissue_patch.shape[0])
+        x = round((self.metadata[pair_id]['patch_x_offset'] - 0.125) * tissue_patch.shape[1])
+        y = round((self.metadata[pair_id]['patch_y_offset'] - 0.125) * tissue_patch.shape[0])
 
         return detect(
             cell=cell_patch,

@@ -5,21 +5,21 @@ from typing import List, Tuple, Dict, Any
 # from line_profiler import LineProfiler
 import cv2
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from time import time
 from threading import Condition
 
+from config import output_root, target
 from user.inference import Model
 from evaluation.eval import _preprocess_distance_and_confidence, _calc_scores
 
 
-# @LineProfiler()
 def main():
-    os.makedirs(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict', exist_ok=True)
-    os.makedirs(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/points', exist_ok=True)
-    os.makedirs(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/visual', exist_ok=True)
+    # os.makedirs(rf'{output_root}/predict', exist_ok=True)
+    # os.makedirs(rf'{output_root}/points', exist_ok=True)
+    # os.makedirs(rf'{output_root}/visual', exist_ok=True)
 
     with open(r'/media/predator/totem/jizheng/ocelot2023/metadata.json', 'r+') as f:
         metadata = json.load(f)
@@ -32,7 +32,7 @@ def main():
             # T.track(f' -> start {code}')
             process(results, model, code, T=T)
 
-    with open(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/score.txt', 'w+') as f:
+    with open(rf'{output_root}/{target}_score.txt', 'w+') as f:
         available = list(metadata['sample_pairs'].keys())
         trains = ['023', '044', '008', '094', '045', '093', '025', '009', '065', '001', '076', '062', '103', '098', '087', '090', '049', '073', '086', '100',
                   '067', '097', '015', '002', '038', '119', '064', '120', '043', '112', '072', '022', '099', '046', '053', '068', '012', '075', '057', '066',
@@ -123,12 +123,12 @@ class Timer(object):
 
 def process(results: dict, model: Model, code: str, T: Timer = None) -> None:
     # # !!!!!!!!!!!!!!!!!!!!!!!!!!!!! 改融合方法时不允许走这个缓存 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # if os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/points/{code}.txt'):
+    # if os.path.exists(rf'{output_root}/points/{code}.txt'):
     #
     #     image_cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
     #     image_cell = cv2.cvtColor(image_cell, cv2.COLOR_BGR2RGB)
     #
-    #     with open(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/points/{code}.txt', 'r+') as f:
+    #     with open(rf'{output_root}/points/{code}.txt', 'r+') as f:
     #         predicts: List[Tuple[int, int, int, float]] = []
     #         for line in f.readlines():
     #             x, y, c, p = line.split(',')
@@ -165,10 +165,10 @@ def process(results: dict, model: Model, code: str, T: Timer = None) -> None:
 
     predicts = model(cell_patch=image_cell, tissue_patch=image_tissue, pair_id=code)
 
-    with open(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/points/{code}.txt', 'w+') as f:
-        f.writelines([
-            f'{x},{y},{c},{round(p, 2)}\n' for x, y, c, p in predicts
-        ])
+    # with open(rf'{output_root}/points/{code}.txt', 'w+') as f:
+    #     f.writelines([
+    #         f'{x},{y},{c},{round(p, 2)}\n' for x, y, c, p in predicts
+    #     ])
 
     f1_mix, f1_bc, f1_tc, mf1 = evaluate(prs=[predicts], gts=[labels])
     T.track(f' -> predicted {code} - f1_mix - {f1_mix} - f1_bc - {f1_bc} - f1_tc - {f1_tc} - mf1 - {mf1}')
@@ -216,33 +216,34 @@ def evaluate(prs: List[List[Tuple[int, int, int, float]]], gts: List[List[Tuple[
 
 
 def visual(code: str, image: np.ndarray, predicts: List[Tuple[int, int, int, float]], labels: List[Tuple[int, int, int]]):
-    cls_color = {
-        1: (153, 204, 153),
-        2: (255, 0, 0),
-    }
-    predict_visual = image.copy()
-    for x, y, c, p in predicts:
-        cv2.circle(predict_visual, (x, y), 3, cls_color[c], 3)
-
-    label_visual = image.copy()
-    for x, y, c in labels:
-        cv2.circle(label_visual, (x, y), 3, cls_color[c], 3)
-
-    if os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/visual/{code}.png'):
-        return
-    fig = plt.figure(code)
-    plt.subplot(1, 2, 1)
-    plt.title('predict')
-    plt.imshow(predict_visual)
-    plt.subplot(1, 2, 2)
-    plt.title('label')
-    plt.imshow(label_visual)
-    # plt.show()
-    fig.savefig(fname=rf'/media/predator/totem/jizheng/ocelot2023/submit_test/visual/{code}.png', dpi=1000)
-    plt.cla()
-    plt.clf()
-    plt.close('all')
-    gc.collect()
+    pass
+    # cls_color = {
+    #     1: (153, 204, 153),
+    #     2: (255, 0, 0),
+    # }
+    # predict_visual = image.copy()
+    # for x, y, c, p in predicts:
+    #     cv2.circle(predict_visual, (x, y), 3, cls_color[c], 3)
+    #
+    # label_visual = image.copy()
+    # for x, y, c in labels:
+    #     cv2.circle(label_visual, (x, y), 3, cls_color[c], 3)
+    #
+    # if os.path.exists(rf'{output_root}/visual/{code}.png'):
+    #     return
+    # fig = plt.figure(code)
+    # plt.subplot(1, 2, 1)
+    # plt.title('predict')
+    # plt.imshow(predict_visual)
+    # plt.subplot(1, 2, 2)
+    # plt.title('label')
+    # plt.imshow(label_visual)
+    # # plt.show()
+    # fig.savefig(fname=rf'{output_root}/visual/{code}.png', dpi=1000)
+    # plt.cla()
+    # plt.clf()
+    # plt.close('all')
+    # gc.collect()
 
 
 main()

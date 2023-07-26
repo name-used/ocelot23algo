@@ -4,7 +4,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from config import output_root
 from .merge import Merger
+# from .fusion_liner import correlated
+# from .fusion_weighter import correlated
 from .fusion_wentai import correlated
 
 
@@ -41,12 +44,12 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
         if cache_code and \
-                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight') and \
-                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight') and \
-                os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight'):
-            coarse_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight')
-            fine_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight')
-            classify_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight')
+                os.path.exists(rf'{output_root}/predict/{cache_code}_coarse.weight') and \
+                os.path.exists(rf'{output_root}/predict/{cache_code}_fine.weight') and \
+                os.path.exists(rf'{output_root}/predict/{cache_code}_classify.weight'):
+            coarse_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_coarse.weight')
+            fine_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_fine.weight')
+            classify_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_classify.weight')
         else:
             # 遍历截图
             patches = []
@@ -84,9 +87,9 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
             )
             coarse_heat_map, fine_heat_map, classify_heat_map = merger.tail()
             if cache_code:
-                torch.save(coarse_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_coarse.weight')
-                torch.save(fine_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_fine.weight')
-                torch.save(classify_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_classify.weight')
+                torch.save(coarse_heat_map, rf'{output_root}/predict/{cache_code}_coarse.weight')
+                torch.save(fine_heat_map, rf'{output_root}/predict/{cache_code}_fine.weight')
+                torch.save(classify_heat_map, rf'{output_root}/predict/{cache_code}_classify.weight')
 
     # 然后执行组织分割任务，生成分割热图
     with torch.no_grad():
@@ -100,8 +103,8 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
                 device=device,
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
-        if cache_code and os.path.exists(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight'):
-            divide_heat_map = torch.load(rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight')
+        if cache_code and os.path.exists(rf'{output_root}/predict/{cache_code}_divide.weight'):
+            divide_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_divide.weight')
         else:
             # 遍历截图
             patches = []
@@ -118,21 +121,23 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
             # 融合
             merger.set(
                 patches_group=(divide_heat_patch,),
-                grids=[(x, y)]
+                grids=grids,
             )
             divide_heat_map, = merger.tail()
             if cache_code:
-                torch.save(divide_heat_map, rf'/media/predator/totem/jizheng/ocelot2023/submit_test/predict/{cache_code}_divide.weight')
+                torch.save(divide_heat_map, rf'{output_root}/predict/{cache_code}_divide.weight')
 
     # 最后乱七八糟的融合方法各种上，并且返回结果
     with torch.no_grad():
         x, y = offset
         divide_heat_map_cells_like = F.interpolate(divide_heat_map[None, :, y: y + vision, x: x + vision], size=(width, height), mode='bilinear')
         divide_heat_map_cells_like = divide_heat_map_cells_like[0, :, :, :]
+
         return correlated(
             coarse=coarse_heat_map,
             fine=fine_heat_map,
             classify=classify_heat_map,
             divide=divide_heat_map_cells_like,
             device=device,
+            image=cell,
         )
