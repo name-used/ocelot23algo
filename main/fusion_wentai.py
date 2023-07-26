@@ -19,7 +19,7 @@ def correlated(
     """
     根据 detect 设定 class
     """
-    thresh = 0.2
+    thresh = 0.30
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
@@ -50,15 +50,18 @@ def correlated(
 
 
 def heatmap_nms(hm: np.ndarray):
-    a = (hm * 255).astype(np.int32)
-    a1 = cv2.blur(hm, (3, 3)).astype(np.int32)
-    a2 = cv2.blur(hm, (5, 5)).astype(np.int32)
-    a3 = cv2.blur(hm, (7, 7)).astype(np.int32)
-    ohb = (hm > 0.).astype(np.float32)
-
-    h = a + a1 + a2 + a3
-
-    h = (h / 4).astype(np.float32)
+    # a = (hm * 255).astype(np.int32)
+    # a1 = cv2.blur(hm * 255, (3, 3)).astype(np.int32)
+    # a2 = cv2.blur(hm * 255, (5, 5)).astype(np.int32)
+    # a3 = cv2.blur(hm * 255, (7, 7)).astype(np.int32)
+    # h = a + a1 + a2 + a3
+    # h = (h / 4).astype(np.float32)
+    device = 'cpu'
+    kernel = gaussian_kernel(size=29, steep=4, device=device)    # 初始值 9
+    kernel = kernel / kernel.sum()
+    h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=14, dilation=1, groups=1)
+    h = h[0, 0, :, :].detach().cpu().numpy()
 
     ht = torch.tensor(h)[None, None, ...]
     # htm = torch.nn.functional.max_pool2d(ht, 3, stride=1, padding=1)
@@ -69,6 +72,7 @@ def heatmap_nms(hm: np.ndarray):
     # h找到0和最大值的点为1
     h = (h >= hmax).astype(np.float32)
     # ohb为检测有结果的像素点，h就是得到最大值的像素点
+    ohb = (hm > 0.).astype(np.float32)
     h = h * ohb
     # 将h最大值的点膨胀
     h = cv2.dilate(h, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)

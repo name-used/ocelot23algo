@@ -1,29 +1,74 @@
+from typing import List, Tuple
+
+import cv2
 import torch
 import json
+import segmentation_models_pytorch as smp
 
 from config import output_root
 
 
 def main():
-    # 预测权重
-    coarse = torch.load(rf'{output_root}/predict/{code}_coarse.weight')
-    fine = torch.load(rf'{output_root}/predict/{code}_fine.weight')
-    classify = torch.load(rf'{output_root}/predict/{code}_classify.weight')
-    divide = torch.load(rf'{output_root}/predict/{code}_divide.weight')
-    # 图片
-    cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
-    cell = cv2.cvtColor(cell, cv2.COLOR_BGR2RGB)
-    # 细胞检测标签
-    with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
-        labels: List[Tuple[int, int, int]] = []
-        for line in f.readlines():
-            x, y, c = map(int, line.split(','))
-            labels.append((x, y, c))
+
+    net = Net(16)
+    net.to(device)
+
+    print(net)
+
+    inputs = torch.zeros(1, 3, 16, 16, dtype=torch.float32, device=device)
+
+    outputs = net(inputs, None, None, None, None)
+
+    print(inputs.shape, len(outputs), [x.shape for x in outputs])
+
+    return
+
+    for code in trains:
+        # 预测权重
+        coarse = torch.load(rf'{output_root}/predict/{code}_coarse.weight')
+        fine = torch.load(rf'{output_root}/predict/{code}_fine.weight')
+        classify = torch.load(rf'{output_root}/predict/{code}_classify.weight')
+        divide = torch.load(rf'{output_root}/predict/{code}_divide.weight')
+        # 图片
+        cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
+        cell = cv2.cvtColor(cell, cv2.COLOR_BGR2RGB)
+        # 细胞检测标签
+        with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
+            labels: List[Tuple[int, int, int]] = []
+            for line in f.readlines():
+                x, y, c = map(int, line.split(','))
+                labels.append((x, y, c))
 
 
 class Net(torch.nn.Module):
-    def __int__(self):
+    model_id = 'lasted'
 
+    def __init__(self, out_dim: int):
+        super().__init__()
+        self.encoder = smp.encoders.get_encoder(
+            name='resnet18',
+            in_channels=3,
+            depth=2,
+            weights=None,
+            output_stride=32,
+            random=True,
+        )
+        pass
+        # self.encoder = smp.encoders.vgg.VGGEncoder(out_channels=16, batch_norm=True)
+
+    def forward(
+            self,
+            image: torch.Tensor,        # (b, 3, 1024, 1024)
+            coarse: torch.Tensor,       # (b, 1, 1024, 1024)
+            fine: torch.Tensor,         # (b, 1, 1024, 1024)
+            classify: torch.Tensor,     # (b, 2, 1024, 1024)
+            divide: torch.Tensor,       # (b, 2, 1024, 1024)
+    ):
+        _, character_8, character_4 = self.encoder(image)
+        return self.encoder(image)
+
+
+device = 'cuda:0'
 
 with open(r'/media/predator/totem/jizheng/ocelot2023/metadata.json', 'r+') as f:
     metadata = json.load(f)

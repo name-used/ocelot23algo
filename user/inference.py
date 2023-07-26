@@ -18,7 +18,35 @@ class Model:
         self.developing = developing
 
     def __call__(self, cell_patch: np.ndarray[np.uint8], tissue_patch: np.ndarray[np.uint8], pair_id: str) -> List[Tuple[int, int, int, float]]:
+
+        # 试着加点断言，看看会不会报错，以确定提交数据是否具备一致性
+        # tissue - cell 比例关系锁定为四倍
+        assert round(self.metadata[pair_id]['tissue']['resized_mpp_x'] / self.metadata[pair_id]['cell']['resized_mpp_x']) == 4
+        assert round(self.metadata[pair_id]['tissue']['resized_mpp_y'] / self.metadata[pair_id]['cell']['resized_mpp_y']) == 4
+        # 横纵长锁定为 1024
+        assert round(
+            (self.metadata[pair_id]['tissue']['x_end'] - self.metadata[pair_id]['tissue']['x_start']) *
+            self.metadata[pair_id]['mpp_x'] / self.metadata[pair_id]['tissue']['resized_mpp_x']
+        ) == 1024
+        assert round(
+            (self.metadata[pair_id]['tissue']['y_end'] - self.metadata[pair_id]['tissue']['y_start']) *
+            self.metadata[pair_id]['mpp_y'] / self.metadata[pair_id]['tissue']['resized_mpp_y']
+        ) == 1024
+        assert round(
+            (self.metadata[pair_id]['cell']['x_end'] - self.metadata[pair_id]['cell']['x_start']) *
+            self.metadata[pair_id]['mpp_x'] / self.metadata[pair_id]['cell']['resized_mpp_x']
+        ) == 1024
+        assert round(
+            (self.metadata[pair_id]['cell']['y_end'] - self.metadata[pair_id]['cell']['y_start']) *
+            self.metadata[pair_id]['mpp_y'] / self.metadata[pair_id]['cell']['resized_mpp_y']
+        ) == 1024
+
         # 从 metadata 中生成 cell 图在 tissue 图里的偏移量，其它参数都是固定的，不用管
+        # 在上述确定的比例关系下，cell 在 tissue 中占据视野为 256*256
+        # 而 (x, y) 在 metadata 中表示中心点，我们需要它表示左上角
+        # 因此 (x, y) = (x, y) - (256, 256) / 2
+        # x = round(self.metadata[pair_id]['patch_x_offset'] * 1024 - 128)
+        # y = round(self.metadata[pair_id]['patch_y_offset'] * 1024 - 128)
         x = round((self.metadata[pair_id]['patch_x_offset'] - 0.125) * tissue_patch.shape[1])
         y = round((self.metadata[pair_id]['patch_y_offset'] - 0.125) * tissue_patch.shape[0])
 

@@ -6,9 +6,9 @@ import torch.nn.functional as F
 
 from config import output_root
 from .merge import Merger
-# from .fusion_liner import correlated
+from .fusion_liner import correlated
 # from .fusion_weighter import correlated
-from .fusion_wentai import correlated
+# from .fusion_wentai import correlated
 
 
 detector = torch.jit.load('./weights/detector-jit.pth')
@@ -72,9 +72,9 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
             coarse_patch, fine_patch, classify_patch = detector(image)
 
             # 在这里做升降采样
-            coarse_patch = F.interpolate(coarse_patch, size=(kernel, kernel), mode='bilinear').contiguous()
-            fine_patch = F.interpolate(fine_patch, size=(kernel, kernel), mode='bilinear').contiguous()
-            classify_patch = F.interpolate(classify_patch, size=(kernel, kernel), mode='bilinear').contiguous()
+            coarse_patch = F.interpolate(coarse_patch, size=(kernel, kernel), mode='bilinear', align_corners=False).contiguous()
+            fine_patch = F.interpolate(fine_patch, size=(kernel, kernel), mode='bilinear', align_corners=False).contiguous()
+            classify_patch = F.interpolate(classify_patch, size=(kernel, kernel), mode='bilinear', align_corners=False).contiguous()
 
             # 预测后处理
             coarse_patch = coarse_patch.softmax(dim=1)[:, 1:, :, :]
@@ -130,7 +130,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
     # 最后乱七八糟的融合方法各种上，并且返回结果
     with torch.no_grad():
         x, y = offset
-        divide_heat_map_cells_like = F.interpolate(divide_heat_map[None, :, y: y + vision, x: x + vision], size=(width, height), mode='bilinear')
+        divide_heat_map_cells_like = F.interpolate(divide_heat_map[None, :, y: y + vision, x: x + vision], size=(width, height), mode='bilinear', align_corners=False)
         divide_heat_map_cells_like = divide_heat_map_cells_like[0, :, :, :]
 
         return correlated(
