@@ -6,9 +6,9 @@ import torch.nn.functional as F
 
 from config import output_root
 from .merge import Merger
-from .fusion_liner import correlated
+# from .fusion_liner import correlated
 # from .fusion_weighter import correlated
-# from .fusion_wentai import correlated
+from .fusion_wentai import correlated
 
 
 detector = torch.jit.load('./weights/detector-jit.pth')
@@ -23,7 +23,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
     step = 256
     vision = 256
     steep = 3
-    device = 'cuda:0'
+    device = 'cuda:1'
 
     # 基本操作
     detector.to(device)
@@ -47,9 +47,9 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
                 os.path.exists(rf'{output_root}/predict/{cache_code}_coarse.weight') and \
                 os.path.exists(rf'{output_root}/predict/{cache_code}_fine.weight') and \
                 os.path.exists(rf'{output_root}/predict/{cache_code}_classify.weight'):
-            coarse_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_coarse.weight')
-            fine_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_fine.weight')
-            classify_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_classify.weight')
+            coarse_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_coarse.weight', map_location=device)
+            fine_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_fine.weight', map_location=device)
+            classify_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_classify.weight', map_location=device)
         else:
             # 遍历截图
             patches = []
@@ -104,7 +104,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
         if cache_code and os.path.exists(rf'{output_root}/predict/{cache_code}_divide.weight'):
-            divide_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_divide.weight')
+            divide_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_divide.weight', map_location=device)
         else:
             # 遍历截图
             patches = []
