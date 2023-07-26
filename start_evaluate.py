@@ -80,19 +80,19 @@ def main():
         )
         f.writelines([
             '--------------------全体评分--------------------\n',
-            'f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % (f1_mix_all, f1_bc_all, f1_tc_all, mf1_all),
+            'f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % (f1_mix_all, f1_bc_all, f1_tc_all, mf1_all),
             '--------------------训练集评分--------------------\n',
-            'f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % (f1_mix_train, f1_bc_train, f1_tc_train, mf1_train),
+            'f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % (f1_mix_train, f1_bc_train, f1_tc_train, mf1_train),
             '--------------------验证集评分--------------------\n',
-            'f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % (f1_mix_valid, f1_bc_valids, f1_tc_valids, mf1_valids),
+            'f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % (f1_mix_valid, f1_bc_valids, f1_tc_valids, mf1_valids),
             '--------------------损坏集评分--------------------\n',
-            'f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % (f1_mix_blocks, f1_bc_blocks, f1_tc_blocks, mf1_blocks),
+            'f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % (f1_mix_blocks, f1_bc_blocks, f1_tc_blocks, mf1_blocks),
             '--------------------逐图片评分（训练集）--------------------\n',
-            *[f'{code} --> f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % results[code]['score'] for code in trains],
+            *[f'{code} --> f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % results[code]['score'] for code in trains],
             '--------------------逐图片评分（验证集）--------------------\n',
-            *[f'{code} --> f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % results[code]['score'] for code in valids],
+            *[f'{code} --> f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % results[code]['score'] for code in valids],
             '--------------------逐图片评分（损坏集）--------------------\n',
-            *[f'{code} --> f1_mix: %.2f \t f1_bc: %.2f \t f1_tc: %.2f \t mf1: %.2f\n' % results[code]['score'] for code in blocks],
+            *[f'{code} --> f1_mix: %.4f \t f1_bc: %.4f \t f1_tc: %.4f \t mf1: %.4f\n' % results[code]['score'] for code in blocks],
         ])
 
 
@@ -104,12 +104,12 @@ class Timer(object):
 
     def __enter__(self):
         with self.con:
-            print('#%s enter at %.2f seconds' % ('\t' * self.indentation, time() - self.start))
+            print('#%s enter at %.4f seconds' % ('\t' * self.indentation, time() - self.start))
         return self.tab()
 
     def track(self, message: str):
         with self.con:
-            print('#%s %s -> at time %.2f' % ('\t' * self.indentation, message, time() - self.start))
+            print('#%s %s -> at time %.4f' % ('\t' * self.indentation, message, time() - self.start))
 
     def tab(self):
         with self.con:
@@ -117,7 +117,7 @@ class Timer(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         with self.con:
-            print('#%s exit at %.2f seconds' % ('\t' * self.indentation, time() - self.start))
+            print('#%s exit at %.4f seconds' % ('\t' * self.indentation, time() - self.start))
             return False
 
 
@@ -183,7 +183,7 @@ def process(results: dict, model: Model, code: str, T: Timer = None) -> None:
 
 
 def evaluate(prs: List[List[Tuple[int, int, int, float]]], gts: List[List[Tuple[int, int, int]]]) -> Tuple[float, float, float, float]:
-    dist = 18
+    dist = 15
     # 先计算正常结果
     prs = [[(x, y, c, p) for x, y, c, p in pr] for pr in prs]
     # gts = [[(x, y, c) for x, y, c in gt] for gt in gts]
