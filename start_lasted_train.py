@@ -13,7 +13,7 @@ import segmentation_models_pytorch as smp
 from config import output_root
 
 
-def main():
+def train():
     net = Net()
     net.to(device)
     optimizer = torch.optim.Adam(params=net.parameters(), lr=1e-3, eps=1e-17)
@@ -61,10 +61,10 @@ def main():
                         divides.append(divide[:, y:y + 16, x:x + 16])
                         gts.append(torch.tensor([
                             # 维度 0 表示点的自信度
-                            (label[:, y:y + 16, x:x + 16].sum(0) * kernel).sum(),
+                            (label[:, y:y + 16, x:x + 16].sum(0) * kernel).sum().clamp(0, 1),
                             # 维度 1、2 表示点的类型
-                            (label[0, y:y + 16, x:x + 16] * kernel).sum(),
-                            (label[1, y:y + 16, x:x + 16] * kernel).sum(),
+                            (label[0, y:y + 16, x:x + 16] * kernel).sum().clamp(0, 1),
+                            (label[1, y:y + 16, x:x + 16] * kernel).sum().clamp(0, 1),
                         ], dtype=torch.float32, device=device))
 
                 images = torch.stack(images).type(torch.float32)
@@ -83,6 +83,67 @@ def main():
                 T.track(f' -> epoch {i}: training {code} with loss %.4f and dist %.4f' % (loss, ((prs - gts) * gts).abs().sum() / (gts.sum() + 1e-17)))
                 optimizer.step()
             torch.save(net, f'./training_weights/epoch-{i}.pth')
+
+
+def test():
+    net = torch.load(f'./training_weights/epoch-39.pth')
+    net.to(device)
+
+    with Timer() as T:
+        for code in valids:
+            T.track(f' ------------------------------------ {code} ------------------------------------ ')
+            # 预测权重
+            coarse = torch.load(rf'{output_root}/predict/{code}_coarse.weight', map_location=device)
+            fine = torch.load(rf'{output_root}/predict/{code}_fine.weight', map_location=device)
+            classify = torch.load(rf'{output_root}/predict/{code}_classify.weight', map_location=device)
+            divide = torch.load(rf'{output_root}/predict/{code}_divide.weight', map_location=device)
+            # 图片
+            image = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = torch.tensor(image / 255, dtype=torch.float32, device=device).permute(2, 0, 1)
+            # 细胞检测标签
+            label = torch.zeros_like(classify)
+            with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
+                for line in f.readlines():
+                    x, y, c = map(int, line.split(','))
+                    label[c - 1, y, x] = 1
+            # 组织为 batches 进行训练
+            images = []
+            coarses = []
+            fines = []
+            classifies = []
+            divides = []
+            gts = []
+            for y in range(0, 1024 - 16 + 1, 16):
+                for x in range(0, 1024 - 16 + 1, 16):
+                    images.append(image[:, y:y + 16, x:x + 16])
+                    coarses.append(coarse[:, y:y + 16, x:x + 16])
+                    fines.append(fine[:, y:y + 16, x:x + 16])
+                    classifies.append(classify[:, y:y + 16, x:x + 16])
+                    divides.append(divide[:, y:y + 16, x:x + 16])
+                    gts.append(torch.tensor([
+                        # 维度 0 表示点的自信度
+                        label[:, y:y + 16, x:x + 16].sum().clamp(0, 1),
+                        # 维度 1、2 表示点的类型
+                        label[0, y:y + 16, x:x + 16].sum().clamp(0, 1),
+                        label[1, y:y + 16, x:x + 16].sum().clamp(0, 1),
+                    ], dtype=torch.float32, device=device))
+
+            images = torch.stack(images).type(torch.float32)
+            coarses = torch.stack(coarses).type(torch.float32)
+            fines = torch.stack(fines).type(torch.float32)
+            classifies = torch.stack(classifies).type(torch.float32)
+            divides = torch.stack(divides).type(torch.float32)
+            gts = torch.stack(gts).type(torch.float32)
+
+            prs = net(images, coarses, fines, classifies, divides)
+
+            T1 = T.tab()
+            for thresh in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]:
+                T1.track(
+                    f' -> thresh {thresh}, count gts {gts.sum(dim=0).type(torch.int64).tolist()}, sum prs {prs.sum(dim=0).type(torch.int64).tolist()}'
+                    f'correct pix {(gts * (prs > thresh)).sum(dim=0).type(torch.int64).tolist()}'
+                )
 
 
 class Net(torch.nn.Module):
@@ -116,7 +177,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(64),
-            # torch.nn.GELU(),
+            torch.nn.GELU(),
             # 分层卷积
             torch.nn.Conv2d(
                 in_channels=64,
@@ -132,7 +193,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(64),
-            # torch.nn.GELU(),
+            torch.nn.GELU(),
             # 通道卷积
             torch.nn.Conv2d(
                 in_channels=64,
@@ -148,6 +209,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(3),
+            torch.nn.GELU(),
             # 分类卷积
             torch.nn.Conv2d(
                 in_channels=3,
@@ -309,4 +371,5 @@ def demo():
 
 
 # demo()
-main()
+# train()
+test()
