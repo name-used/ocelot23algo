@@ -50,10 +50,6 @@ def correlated(
     # 获得类型列
     classes = get_cls_pts_from_hm(points, classify)
 
-    # 修改肿瘤区域内的类型
-    classes = [1 if divide[0, y, x] <= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
-    # classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
-
     # 获得概率列
     possibility = [combo[y, x, 0] for y, x in points]
 

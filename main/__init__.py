@@ -6,9 +6,12 @@ import torch.nn.functional as F
 
 from config import output_root
 from .merge import Merger
+from .fusion_liner_gauss import correlated    # *
 # from .fusion_liner import correlated
 # from .fusion_weighter import correlated
-from .fusion_wentai import correlated
+# from .fusion_wentai import correlated
+# from .fusion_jassor import correlated
+# from .fusion_xuge import correlated
 
 
 detector = torch.jit.load('./weights/detector-jit.pth')

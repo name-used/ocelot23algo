@@ -52,8 +52,10 @@ def train():
                 classifies = []
                 divides = []
                 gts = []
-                for y in range(0, 1024 - 16 + 1, 16):
-                    for x in range(0, 1024 - 16 + 1, 16):
+                xs = (torch.rand(64) * 1024).type(torch.int64).clamp(0, 1024 - 16)
+                ys = (torch.rand(64) * 1024).type(torch.int64).clamp(0, 1024 - 16)
+                for y in ys:
+                    for x in xs:
                         images.append(image[:, y:y + 16, x:x + 16])
                         coarses.append(coarse[:, y:y + 16, x:x + 16])
                         fines.append(fine[:, y:y + 16, x:x + 16])
@@ -76,17 +78,17 @@ def train():
 
                 prs = net(images, coarses, fines, classifies, divides)
 
-                loss = gts * torch.log(prs + 1e-17) + (1 - gts) * torch.log(1 - prs + 1e-17)
+                loss = 20 * gts * torch.log(prs + 1e-17) + (1 - gts) * torch.log(1 - prs + 1e-17)
                 loss = - loss.sum()
                 loss.backward()
 
                 T.track(f' -> epoch {i}: training {code} with loss %.4f and dist %.4f' % (loss, ((prs - gts) * gts).abs().sum() / (gts.sum() + 1e-17)))
                 optimizer.step()
-            torch.save(net, f'./training_weights/epoch-{i}.pth')
+            torch.save(net, f'./training_weights/epoch-{i + 1}.pth')
 
 
 def test():
-    net = torch.load(f'./training_weights/epoch-39.pth')
+    net = torch.load(f'./training_weights/epoch-40.pth')
     net.to(device)
 
     with Timer() as T:
@@ -177,7 +179,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(64),
-            torch.nn.GELU(),
+            # torch.nn.GELU(),
             # 分层卷积
             torch.nn.Conv2d(
                 in_channels=64,
@@ -193,7 +195,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(64),
-            torch.nn.GELU(),
+            # torch.nn.GELU(),
             # 通道卷积
             torch.nn.Conv2d(
                 in_channels=64,
@@ -209,7 +211,7 @@ class Net(torch.nn.Module):
                 dtype=None,
             ),
             torch.nn.BatchNorm2d(3),
-            torch.nn.GELU(),
+            # torch.nn.GELU(),
             # 分类卷积
             torch.nn.Conv2d(
                 in_channels=3,
@@ -302,7 +304,7 @@ class Timer(object):
             return False
 
 
-device = 'cuda:1'
+device = 'cuda:0'
 
 with open(r'/media/predator/totem/jizheng/ocelot2023/metadata.json', 'r+') as f:
     metadata = json.load(f)
@@ -371,5 +373,5 @@ def demo():
 
 
 # demo()
-# train()
-test()
+train()
+# test()
