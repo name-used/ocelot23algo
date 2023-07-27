@@ -17,28 +17,42 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    直接根据 divide 设定class
+    将 detect 和 divide 线性分配设定 class
     """
+
+    # 点检测的设定阈值
+    thresh = 0.3
+    # detect 结果相关的软阈值
+    limit = 1e-17
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
     # 联合图转换至网络形式
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
-    # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
+    # w = 2 * c * (1 - c)
+    # p = t * w + c * (1 - w)
+    classify = classify + limit
+    classify = classify / classify.sum(dim=0, keepdim=True)
+    weights = 2 * classify * (1 - classify)
+    classify = divide * weights + classify * (1 - weights)
+    classify = classify[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
-    # classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
+    classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
 
     # 范围截断
-    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0])
+    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0], device=device)
 
     # 获得点列
-    points = get_pts_from_hm(combo, 0.3)
+    points = get_pts_from_hm(combo, thresh)
 
     # 获得类型列
-    # classes = get_cls_pts_from_hm(points, classify)
-    classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
+    classes = get_cls_pts_from_hm(points, classify)
+
+    # 修改肿瘤区域内的类型
+    classes = [1 if divide[0, y, x] <= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
+    # classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
 
     # 获得概率列
     possibility = [combo[y, x, 0] for y, x in points]
@@ -48,16 +62,12 @@ def correlated(
     return points
 
 
-def heatmap_nms(hm: np.ndarray):
-    a = (hm * 255).astype(np.int32)
-    a1 = cv2.blur(hm, (3, 3)).astype(np.int32)
-    a2 = cv2.blur(hm, (5, 5)).astype(np.int32)
-    a3 = cv2.blur(hm, (7, 7)).astype(np.int32)
-    ohb = (hm > 0.).astype(np.float32)
-
-    h = a + a1 + a2 + a3
-
-    h = (h / 4).astype(np.float32)
+def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
+    kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
+    kernel = kernel / kernel.sum()
+    h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
+    h = h[0, 0, :, :].detach().cpu().numpy()
 
     ht = torch.tensor(h)[None, None, ...]
     # htm = torch.nn.functional.max_pool2d(ht, 3, stride=1, padding=1)
@@ -68,6 +78,7 @@ def heatmap_nms(hm: np.ndarray):
     # h找到0和最大值的点为1
     h = (h >= hmax).astype(np.float32)
     # ohb为检测有结果的像素点，h就是得到最大值的像素点
+    ohb = (hm > 0.).astype(np.float32)
     h = h * ohb
     # 将h最大值的点膨胀
     h = cv2.dilate(h, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)

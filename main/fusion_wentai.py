@@ -57,7 +57,7 @@ def heatmap_nms(hm: np.ndarray):
     # h = a + a1 + a2 + a3
     # h = (h / 4).astype(np.float32)
     device = 'cuda:1'
-    kernel = gaussian_kernel(size=17, steep=4, device=device)    # 初始值 9
+    kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)

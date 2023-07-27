@@ -18,4 +18,4 @@ def gaussian_kernel(size: int = 3, steep: float = 2, device: str = 'cpu') -> tor
     # the numbers are too small ~ and there is no influence on multiple
     kernel = torch.matmul(kernel_1d.T, kernel_1d)
     kernel /= kernel.mean()
-    return kernel[None, None, :, :]
+    return kernel
