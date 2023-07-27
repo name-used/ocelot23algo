@@ -25,7 +25,7 @@ class Merger(object):
         ]
         self.helper: torch.Tensor = torch.zeros(1, self.h, self.w, dtype=torch.float64, device=device) + 1e-17
         # kernel 用于 同预测结果相乘 (1, )
-        self.kernel = gaussian_kernel(size=kernel_size, steep=kernel_steep, device=device)
+        self.kernel = gaussian_kernel(size=kernel_size, steep=kernel_steep, device=device)[None, None, :, :]
 
     def set(self, patches_group: Iterable[torch.Tensor], grids: List[Tuple[int, int]]) -> None:
         # 拆 returns
