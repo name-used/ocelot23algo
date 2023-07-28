@@ -17,7 +17,7 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    直接根据 divide 设定class
+    将 detect 和 divide 线性分配设定 class
     """
 
     # 点检测的设定阈值
@@ -31,6 +31,7 @@ def correlated(
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
     classify = combo * classify[None, :, :, :]
+    # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
     classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
@@ -43,10 +44,6 @@ def correlated(
 
     # 获得类型列
     classes = get_cls_pts_from_hm(points, classify)
-
-    # 修改肿瘤区域内的类型
-    # classes = [0 if divide[0, y, x] >= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
-    # classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
 
     # 获得概率列
     possibility = [combo[y, x, 0] for y, x in points]
@@ -61,9 +58,6 @@ def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = h[0, 0, :, :].detach().cpu().numpy()
 
     ht = torch.tensor(h)[None, None, ...]
@@ -73,10 +67,7 @@ def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     htm = torch.nn.functional.max_pool2d(ht, 9, stride=1, padding=4)
     hmax = htm[0, 0, ...].numpy()
     # h找到0和最大值的点为1
-    h = (h >= hmax).astype(np.float32)
-    # ohb为检测有结果的像素点，h就是得到最大值的像素点
-    ohb = (hm > 0.).astype(np.float32)
-    h = h * ohb
+    h = ((h >= hmax) & (h > 0.15)).astype(np.float32)
     # 将h最大值的点膨胀
     h = cv2.dilate(h, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)
 

@@ -17,13 +17,9 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    直接根据 divide 设定class
+    根据 detect 设定 class
     """
-
-    # 点检测的设定阈值
-    thresh = 0.3
-    # detect 结果相关的软阈值
-    limit = 1e-17
+    thresh = 0.30
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
@@ -31,38 +27,37 @@ def correlated(
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
     classify = combo * classify[None, :, :, :]
+    # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
     classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
 
     # 范围截断
-    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0], device=device)
+    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0])
 
     # 获得点列
     points = get_pts_from_hm(combo, thresh)
 
-    # 获得类型列
-    classes = get_cls_pts_from_hm(points, classify)
+    # 完备化
+    points = [(x, y, get_cls_pts_from_hm((x, y), classify)+1, combo[y, x, 0]) for y, x in points]
 
-    # 修改肿瘤区域内的类型
-    # classes = [0 if divide[0, y, x] >= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
-    # classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
-
-    # 获得概率列
-    possibility = [combo[y, x, 0] for y, x in points]
-
-    points = [(x, y, c + 1, p) for (y, x), c, p in zip(points, classes, possibility)]
+    # 去除无分类点
+    points = [p for p in points if p[2]]
 
     return points
 
 
-def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
+def heatmap_nms(hm: np.ndarray):
+    # a = (hm * 255).astype(np.int32)
+    # a1 = cv2.blur(hm * 255, (3, 3)).astype(np.int32)
+    # a2 = cv2.blur(hm * 255, (5, 5)).astype(np.int32)
+    # a3 = cv2.blur(hm * 255, (7, 7)).astype(np.int32)
+    # h = a + a1 + a2 + a3
+    # h = (h / 4).astype(np.float32)
+    device = 'cuda:1'
     kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = h[0, 0, :, :].detach().cpu().numpy()
 
@@ -152,22 +147,13 @@ def make_bbox_from_contour(contour):
     return bbox
 
 
-def get_cls_pts_from_hm(det_pts, cls_hm: np.ndarray):
-    '''
-    从热图中生成中心点
-    :param hm:
-    :param prob:
-    :return:
-    '''
-    assert cls_hm.ndim == 3
-    assert cls_hm.shape[2] >= 1
-    pts_cls = np.zeros([len(det_pts)], np.int64)
+def get_cls_pts_from_hm(point, cls_hm: np.ndarray):
     hw = cls_hm.shape[:2]
-    for i, pt in enumerate(det_pts):
-        probs = np.zeros([cls_hm.shape[2]], np.float32)
-        rr, cc = sk_disk(pt, radius=3, shape=hw)
-        for c in range(cls_hm.shape[2]):
-            probs[c] = cls_hm[rr, cc, c].sum()
-        cls = np.argmax(probs)
-        pts_cls[i] = cls
-    return pts_cls
+    probs = np.zeros([cls_hm.shape[2]], np.float32)
+    rr, cc = sk_disk(point, radius=3, shape=hw)
+    for c in range(cls_hm.shape[2]):
+        probs[c] = cls_hm[rr, cc, c].sum()
+    if probs.sum() > 0.0:
+        return np.argmax(probs)
+    else:
+        return -1

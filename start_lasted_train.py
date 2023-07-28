@@ -304,7 +304,7 @@ class Timer(object):
             return False
 
 
-device = 'cuda:0'
+device = 'cuda:1'
 
 with open(r'/media/predator/totem/jizheng/ocelot2023/metadata.json', 'r+') as f:
     metadata = json.load(f)
