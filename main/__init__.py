@@ -4,14 +4,16 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from config import output_root
+from config import output_root, weight_root
 from .merge import Merger
+# from .fusion_wentai_point_try import correlated
 from .fusion_liner_gauss import correlated    # *
 # from .fusion_liner import correlated
 # from .fusion_weighter import correlated
 # from .fusion_wentai import correlated
 # from .fusion_jassor import correlated
 # from .fusion_xuge import correlated
+# from .fusion_class2point import correlated
 
 
 detector = torch.jit.load('./weights/detector-jit.pth')
@@ -47,12 +49,12 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
         if cache_code and \
-                os.path.exists(rf'{output_root}/predict/{cache_code}_coarse.weight') and \
-                os.path.exists(rf'{output_root}/predict/{cache_code}_fine.weight') and \
-                os.path.exists(rf'{output_root}/predict/{cache_code}_classify.weight'):
-            coarse_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_coarse.weight', map_location=device)
-            fine_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_fine.weight', map_location=device)
-            classify_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_classify.weight', map_location=device)
+                os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_coarse.weight') and \
+                os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_fine.weight') and \
+                os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_classify.weight'):
+            coarse_heat_map = torch.load(rf'{output_root}/{weight_root}/{cache_code}_coarse.weight', map_location=device)
+            fine_heat_map = torch.load(rf'{output_root}/{weight_root}/{cache_code}_fine.weight', map_location=device)
+            classify_heat_map = torch.load(rf'{output_root}/{weight_root}/{cache_code}_classify.weight', map_location=device)
         else:
             # 遍历截图
             patches = []
@@ -90,9 +92,9 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
             )
             coarse_heat_map, fine_heat_map, classify_heat_map = merger.tail()
             if cache_code:
-                torch.save(coarse_heat_map, rf'{output_root}/predict/{cache_code}_coarse.weight')
-                torch.save(fine_heat_map, rf'{output_root}/predict/{cache_code}_fine.weight')
-                torch.save(classify_heat_map, rf'{output_root}/predict/{cache_code}_classify.weight')
+                torch.save(coarse_heat_map, rf'{output_root}/{weight_root}/{cache_code}_coarse.weight')
+                torch.save(fine_heat_map, rf'{output_root}/{weight_root}/{cache_code}_fine.weight')
+                torch.save(classify_heat_map, rf'{output_root}/{weight_root}/{cache_code}_classify.weight')
 
     # 然后执行组织分割任务，生成分割热图
     with torch.no_grad():
@@ -106,8 +108,8 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
                 device=device,
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
-        if cache_code and os.path.exists(rf'{output_root}/predict/{cache_code}_divide.weight'):
-            divide_heat_map = torch.load(rf'{output_root}/predict/{cache_code}_divide.weight', map_location=device)
+        if cache_code and os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_divide.weight'):
+            divide_heat_map = torch.load(rf'{output_root}/{weight_root}/{cache_code}_divide.weight', map_location=device)
         else:
             # 遍历截图
             patches = []
@@ -128,7 +130,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
             )
             divide_heat_map, = merger.tail()
             if cache_code:
-                torch.save(divide_heat_map, rf'{output_root}/predict/{cache_code}_divide.weight')
+                torch.save(divide_heat_map, rf'{output_root}/{weight_root}/{cache_code}_divide.weight')
 
     # 最后乱七八糟的融合方法各种上，并且返回结果
     with torch.no_grad():

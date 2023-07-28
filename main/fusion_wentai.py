@@ -17,23 +17,27 @@ def correlated(
         image: np.ndarray = None,
 ) -> List[Tuple[int, int, int, float]]:
     """
-    根据 detect 设定 class
+    将 detect 和 divide 线性分配设定 class
     """
-    thresh = 0.30
+
+    # 点检测的设定阈值
+    thresh = 0.3
+    # detect 结果相关的软阈值
+    limit = 1e-17
 
     # 粗图 + 精图 -> 联合图
     combo: torch.Tensor = coarse * fine
     # 联合图转换至网络形式
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
-    classify = combo * classify[None, :, :, :]
+    classify = combo * divide[None, :, :, :]
     # classify = combo * classify[None, :, :, :] * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
     classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
 
     # 范围截断
-    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0])
+    combo[:, :, 0] = combo[:, :, 0] * heatmap_nms(combo[:, :, 0], device=device)
 
     # 获得点列
     points = get_pts_from_hm(combo, thresh)
@@ -49,14 +53,7 @@ def correlated(
     return points
 
 
-def heatmap_nms(hm: np.ndarray):
-    # a = (hm * 255).astype(np.int32)
-    # a1 = cv2.blur(hm * 255, (3, 3)).astype(np.int32)
-    # a2 = cv2.blur(hm * 255, (5, 5)).astype(np.int32)
-    # a3 = cv2.blur(hm * 255, (7, 7)).astype(np.int32)
-    # h = a + a1 + a2 + a3
-    # h = (h / 4).astype(np.float32)
-    device = 'cuda:1'
+def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]

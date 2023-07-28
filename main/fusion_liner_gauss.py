@@ -34,7 +34,7 @@ def correlated(
     # p = t * w + c * (1 - w)
     classify = classify + limit
     classify = classify / classify.sum(dim=0, keepdim=True)
-    weights = 2 * classify * (1 - classify)
+    weights = 4 * classify * (1 - classify)
     classify = divide * weights + classify * (1 - weights)
     classify = classify[None, :, :, :]
     # 转入 numpy 交给泰哥代码

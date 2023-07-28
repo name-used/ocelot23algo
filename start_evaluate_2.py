@@ -29,6 +29,8 @@ def main():
     results: Dict[str, Any] = {}
     with Timer() as T:
         for code in metadata['sample_pairs'].keys():
+            # if code != '400':
+            #     continue
             # T.track(f' -> start {code}')
             process(results, model, code, T=T)
 

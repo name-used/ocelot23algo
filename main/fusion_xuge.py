@@ -45,7 +45,7 @@ def correlated(
     classes = get_cls_pts_from_hm(points, classify)
 
     # 修改肿瘤区域内的类型
-    classes = [1 if divide[0, y, x] <= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
+    # classes = [0 if divide[0, y, x] >= divide[1, y, x] else c for (y, x), c in zip(points, classes)]
     # classes = [int(divide[0, y, x] <= divide[1, y, x]) for y, x in points]
 
     # 获得概率列
@@ -60,6 +60,9 @@ def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
+    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = h[0, 0, :, :].detach().cpu().numpy()
 
