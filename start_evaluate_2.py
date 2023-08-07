@@ -3,6 +3,7 @@ import json
 import os
 from typing import List, Tuple, Dict, Any
 # from line_profiler import LineProfiler
+import PIL.Image
 import cv2
 import matplotlib
 # matplotlib.use('Agg')
@@ -29,9 +30,9 @@ def main():
     results: Dict[str, Any] = {}
     with Timer() as T:
         for code in metadata['sample_pairs'].keys():
-            # if code != '400':
-            #     continue
-            # T.track(f' -> start {code}')
+            if code != '400':
+                continue
+            T.track(f' -> start {code}')
             process(results, model, code, T=T)
 
     with open(rf'{output_root}/{target}_score.txt', 'w+') as f:
@@ -165,8 +166,9 @@ def process(results: dict, model: Model, code: str, T: Timer = None) -> None:
     #     visual(code=code, image=image_cell, predicts=predicts, labels=labels)
     #     return
 
-    image_cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
-    image_cell = cv2.cvtColor(image_cell, cv2.COLOR_BGR2RGB)
+    # image_cell = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/cell/image/{code}.jpg')
+    # image_cell = cv2.cvtColor(image_cell, cv2.COLOR_BGR2RGB)
+    image_cell = np.array(PIL.Image.open(rf'/media/predator/totem/jizheng/ocelot2023/test_submit/cell.tif'))
 
     image_tissue = cv2.imread(rf'/media/predator/totem/jizheng/ocelot2023/tissue/image/{code}.jpg')
     image_tissue = cv2.cvtColor(image_tissue, cv2.COLOR_BGR2RGB)
@@ -185,6 +187,99 @@ def process(results: dict, model: Model, code: str, T: Timer = None) -> None:
     #     ])
 
     f1_mix, f1_bc, f1_tc, mf1 = evaluate(prs=[predicts], gts=[labels])
+
+    result = {"type": "Multiple points", "points": [
+        {"name": "image_0", "point": [246, 1018, 2], "probability": 0.35667151724261015},
+            {"name": "image_0", "point": [144, 1000, 2], "probability": 0.3700178278910613},
+            {"name": "image_0", "point": [847, 993, 1], "probability": 0.4897167708231436},
+            {"name": "image_0", "point": [301, 990, 1], "probability": 0.5957599504928234},
+            {"name": "image_0", "point": [7, 986, 1], "probability": 0.5256677062503247},
+            {"name": "image_0", "point": [269, 972, 1], "probability": 0.6741500811347951},
+            {"name": "image_0", "point": [164, 953, 1], "probability": 0.6348970161446135},
+            {"name": "image_0", "point": [4, 952, 1], "probability": 0.3180947088688164},
+            {"name": "image_0", "point": [92, 950, 1], "probability": 0.6350390883489858},
+            {"name": "image_0", "point": [207, 941, 1], "probability": 0.67376227851792},
+            {"name": "image_0", "point": [30, 921, 1], "probability": 0.349892005361781},
+            {"name": "image_0", "point": [317, 917, 1], "probability": 0.44398134907784564},
+            {"name": "image_0", "point": [437, 915, 1], "probability": 0.5501556125786075},
+            {"name": "image_0", "point": [252, 889, 1], "probability": 0.39926971274155676},
+            {"name": "image_0", "point": [204, 882, 1], "probability": 0.6097194534412012},
+            {"name": "image_0", "point": [306, 881, 1], "probability": 0.4129047478479904},
+            {"name": "image_0", "point": [25, 868, 1], "probability": 0.6741966408637909},
+            {"name": "image_0", "point": [1015, 866, 1], "probability": 0.4141620752695641},
+            {"name": "image_0", "point": [455, 849, 1], "probability": 0.6504288273932518},
+            {"name": "image_0", "point": [637, 837, 1], "probability": 0.6603035464428639},
+            {"name": "image_0", "point": [159, 836, 1], "probability": 0.6035069869674388},
+            {"name": "image_0", "point": [368, 826, 1], "probability": 0.4772213071870304},
+            {"name": "image_0", "point": [230, 822, 1], "probability": 0.30771329903695843},
+            {"name": "image_0", "point": [908, 819, 1], "probability": 0.5837563346111099},
+            {"name": "image_0", "point": [152, 817, 1], "probability": 0.30752484217433107},
+            {"name": "image_0", "point": [199, 816, 1], "probability": 0.6749978924527582},
+            {"name": "image_0", "point": [570, 801, 1], "probability": 0.5779000862957151},
+            {"name": "image_0", "point": [542, 793, 1], "probability": 0.6127968395638931},
+            {"name": "image_0", "point": [922, 792, 1], "probability": 0.5729169922209394},
+            {"name": "image_0", "point": [328, 756, 1], "probability": 0.6259490753880931},
+            {"name": "image_0", "point": [143, 750, 1], "probability": 0.65124707921504},
+            {"name": "image_0", "point": [297, 747, 1], "probability": 0.6037934108304238},
+            {"name": "image_0", "point": [642, 742, 1], "probability": 0.6527367422080159},
+            {"name": "image_0", "point": [479, 742, 1], "probability": 0.6269350841793205},
+            {"name": "image_0", "point": [435, 722, 1], "probability": 0.598218276382241},
+            {"name": "image_0", "point": [412, 721, 1], "probability": 0.4474786347929404},
+            {"name": "image_0", "point": [624, 708, 1], "probability": 0.6093212856970491},
+            {"name": "image_0", "point": [923, 705, 1], "probability": 0.4474896329173147},
+            {"name": "image_0", "point": [8, 705, 1], "probability": 0.396557851694698},
+            {"name": "image_0", "point": [821, 697, 1], "probability": 0.6219074144097638},
+            {"name": "image_0", "point": [250, 694, 1], "probability": 0.465422490107734},
+            {"name": "image_0", "point": [600, 681, 1], "probability": 0.4712818238906962},
+            {"name": "image_0", "point": [744, 674, 1], "probability": 0.6949361045958965},
+            {"name": "image_0", "point": [716, 659, 1], "probability": 0.6706858235844109},
+            {"name": "image_0", "point": [314, 649, 1], "probability": 0.37300786575945105},
+            {"name": "image_0", "point": [926, 648, 1], "probability": 0.6162076975278842},
+            {"name": "image_0", "point": [669, 648, 1], "probability": 0.4387533222251688},
+            {"name": "image_0", "point": [999, 636, 1], "probability": 0.6514388674816114},
+            {"name": "image_0", "point": [772, 634, 1], "probability": 0.40153128009380296},
+            {"name": "image_0", "point": [587, 626, 1], "probability": 0.6430122997867431},
+            {"name": "image_0", "point": [827, 616, 1], "probability": 0.4680893372117122},
+            {"name": "image_0", "point": [351, 600, 1], "probability": 0.6556184798189675},
+            {"name": "image_0", "point": [847, 568, 1], "probability": 0.3727153011045247},
+            {"name": "image_0", "point": [638, 565, 1], "probability": 0.6250417706153387},
+            {"name": "image_0", "point": [958, 561, 1], "probability": 0.5431122397478046},
+            {"name": "image_0", "point": [991, 538, 1], "probability": 0.6404798562818816},
+            {"name": "image_0", "point": [797, 538, 1], "probability": 0.52303754970636},
+            {"name": "image_0", "point": [584, 517, 1], "probability": 0.48238819448607617},
+            {"name": "image_0", "point": [614, 476, 1], "probability": 0.3957769546547073},
+            {"name": "image_0", "point": [879, 441, 1], "probability": 0.5537727516548726},
+            {"name": "image_0", "point": [468, 434, 1], "probability": 0.5525132504538329},
+            {"name": "image_0", "point": [727, 425, 1], "probability": 0.5537139994011369},
+            {"name": "image_0", "point": [347, 425, 1], "probability": 0.5650179832967219},
+            {"name": "image_0", "point": [637, 420, 1], "probability": 0.641779471862861},
+            {"name": "image_0", "point": [263, 416, 1], "probability": 0.6101205419854439},
+            {"name": "image_0", "point": [831, 412, 1], "probability": 0.6300556738120962},
+            {"name": "image_0", "point": [306, 374, 1], "probability": 0.3232457719117156},
+            {"name": "image_0", "point": [235, 372, 1], "probability": 0.5903020176273062},
+            {"name": "image_0", "point": [1001, 363, 1], "probability": 0.47394391272643543},
+            {"name": "image_0", "point": [251, 343, 1], "probability": 0.3346457513396063},
+            {"name": "image_0", "point": [362, 230, 1], "probability": 0.4538018182574449},
+            {"name": "image_0", "point": [535, 227, 1], "probability": 0.48168726725644745},
+            {"name": "image_0", "point": [572, 204, 1], "probability": 0.6161888961369923},
+            {"name": "image_0", "point": [352, 196, 1], "probability": 0.3127758453735342},
+            {"name": "image_0", "point": [15, 170, 1], "probability": 0.7052349753436502},
+            {"name": "image_0", "point": [57, 158, 1], "probability": 0.5156896928736288},
+            {"name": "image_0", "point": [594, 153, 1], "probability": 0.5994958359243968},
+            {"name": "image_0", "point": [127, 127, 1], "probability": 0.5817544565533197},
+            {"name": "image_0", "point": [77, 107, 1], "probability": 0.6509113009749117},
+            {"name": "image_0", "point": [836, 102, 1], "probability": 0.552578725290019},
+            {"name": "image_0", "point": [382, 85, 1], "probability": 0.5833780724624711},
+            {"name": "image_0", "point": [345, 83, 1], "probability": 0.5874185589646144},
+            {"name": "image_0", "point": [348, 26, 1], "probability": 0.5507228551349095},
+            {"name": "image_0", "point": [525, 8, 1], "probability": 0.3744287977294678}
+    ],"version": {"major": 1, "minor": 0}}
+    rst = [(*r['point'], r['probability']) for r in result['points']]
+    r1 = evaluate(prs=[rst], gts=[labels])
+    r2 = evaluate(prs=[predicts], gts=[labels])
+    print(r1)
+    print(r2)
+
     T.track(f' -> predicted {code} - f1_mix - {f1_mix} - f1_bc - {f1_bc} - f1_tc - {f1_tc} - mf1 - {mf1}')
 
     results[code] = {
