@@ -60,10 +60,10 @@ def correlated(
 
 def heatmap_nms(hm: np.ndarray):
     a = (hm * 255).astype(np.int32)
-    a1 = cv2.blur(hm, (3, 3)).astype(np.int32)
-    a2 = cv2.blur(hm, (5, 5)).astype(np.int32)
-    a3 = cv2.blur(hm, (7, 7)).astype(np.int32)
-    ohb = (hm > 0.).astype(np.float32)
+    a1 = cv2.blur(hm * 255, (3, 3)).astype(np.int32)
+    a2 = cv2.blur(hm * 255, (5, 5)).astype(np.int32)
+    a3 = cv2.blur(hm * 255, (7, 7)).astype(np.int32)
+    ohb = (hm * 255 > 0.).astype(np.float32)
 
     h = a + a1 + a2 + a3
 

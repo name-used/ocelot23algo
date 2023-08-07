@@ -7,10 +7,10 @@ import torch.nn.functional as F
 from config import output_root, weight_root
 from .merge import Merger
 # from .fusion_wentai_point_try import correlated
-from .fusion_liner_gauss import correlated    # *
+# from .fusion_liner_gauss import correlated    # *
 # from .fusion_liner import correlated
 # from .fusion_weighter import correlated
-# from .fusion_wentai import correlated
+from .fusion_wentai import correlated
 # from .fusion_jassor import correlated
 # from .fusion_xuge import correlated
 # from .fusion_class2point import correlated
@@ -28,7 +28,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
     step = 256
     vision = 256
     steep = 3
-    device = 'cuda:1'
+    device = 'cuda:2'
 
     # 基本操作
     detector.to(device)
@@ -48,7 +48,7 @@ def detect(cell: np.ndarray[np.uint8], tissue: np.ndarray[np.uint8], offset: Tup
                 device=device,
         )
         # 开发时有缓存用缓存，实际跑的时候没这东西
-        if cache_code and \
+        if False and cache_code and \
                 os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_coarse.weight') and \
                 os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_fine.weight') and \
                 os.path.exists(rf'{output_root}/{weight_root}/{cache_code}_classify.weight'):

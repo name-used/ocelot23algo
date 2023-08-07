@@ -30,7 +30,7 @@ def correlated(
     # 联合图转换至网络形式
     combo: torch.Tensor = combo[None, :, :, :]
     # 类型图 -> 类型热图
-    classify = combo * classify[None, :, :, :]
+    classify = combo * divide[None, :, :, :]
     # 转入 numpy 交给泰哥代码
     combo = combo[0, 0, :, :, None].cpu().numpy()
     classify = classify[0, :, :, :].permute(1, 2, 0).cpu().numpy()
@@ -60,8 +60,8 @@ def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     kernel = gaussian_kernel(size=17, steep=3, device=device)[None, None, :, :]    # 初始值 9
     kernel = kernel / kernel.sum()
     h = torch.tensor(hm, dtype=torch.float64, device=device)[None, None, :, :]
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
-    h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
+    # h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
+    # h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = torch.conv2d(h, kernel, bias=None, stride=1, padding=8, dilation=1, groups=1)
     h = h[0, 0, :, :].detach().cpu().numpy()
@@ -78,7 +78,7 @@ def heatmap_nms(hm: np.ndarray, device: str = 'cpu'):
     ohb = (hm > 0.).astype(np.float32)
     h = h * ohb
     # 将h最大值的点膨胀
-    h = cv2.dilate(h, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)
+    h = cv2.dilate(h, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=2)
 
     return h
 

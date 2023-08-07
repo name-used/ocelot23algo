@@ -32,8 +32,7 @@ def main():
             with open(rf'/media/predator/totem/jizheng/ocelot2023/cell/label_origin/{code}.csv', 'r+') as f:
                 for line in f.readlines():
                     x, y, c = map(int, line.split(','))
-                    
-                    labels.append((x, y, c))
+                    # labels.append((x, y, c))
             # 组织为 batches 进行训练
             outputs = net(image, coarse, fine, classify, divide)
             loss = label * torch.log(outputs + 1e-17) + (1 - label) * torch.log(1 - outputs + 1e-17)
@@ -41,6 +40,7 @@ def main():
             loss.backward()
         optimizer.step()
     for code in trains:
+        pass
 
 
 class Net(torch.nn.Module):
